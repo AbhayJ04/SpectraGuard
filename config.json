@@ -1,0 +1,29 @@
+{
+  "trusted_domains": [
+    "examplecorp.com",
+    "vendorco.com"
+  ],
+  "known_contacts": {
+    "priya.nair@examplecorp.com": "Priya Nair",
+    "arjun.rao@examplecorp.com": "Arjun Rao",
+    "accounts@vendorco.com": "VendorCo Accounts"
+  },
+  "weights": {
+    "auth_domain": 0.3,
+    "url": 0.25,
+    "sender": 0.2,
+    "request": 0.15,
+    "correlation": 0.1
+  },
+  "thresholds": {
+    "flag": 0.3,
+    "quarantine": 0.5
+  },
+  "correlation": {
+    "window_minutes": 60,
+    "text_similarity": 0.5,
+    "min_peer_base": 0.2,
+    "min_indicators": 2
+  },
+  "auto_quarantine": true
+}

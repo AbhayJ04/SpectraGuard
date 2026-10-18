@@ -1,0 +1,110 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>SpectraGuard MVP</title>
+<style>
+  :root { --bg:#0b0f17; --panel:#121a27; --line:#243049; --text:#e6edf7; --mute:#8b98b0;
+          --ok:#2fbf71; --warn:#f0b429; --bad:#ef4f5f; --acc:#27d3e6; }
+  * { box-sizing:border-box; }
+  body { margin:0; font:14px/1.45 system-ui,Segoe UI,Arial,sans-serif; background:var(--bg); color:var(--text); }
+  header { padding:14px 20px; border-bottom:1px solid var(--line); display:flex; gap:12px; align-items:center; flex-wrap:wrap; }
+  header h1 { font-size:17px; margin:0 12px 0 0; }
+  button { background:var(--panel); color:var(--text); border:1px solid var(--line); padding:6px 12px; border-radius:6px; cursor:pointer; font:inherit; }
+  button:hover { border-color:var(--acc); }
+  main { display:grid; grid-template-columns:minmax(300px,1fr) minmax(320px,1.3fr); gap:16px; padding:16px 20px; }
+  @media (max-width:800px) { main { grid-template-columns:1fr; } }
+  .panel { background:var(--panel); border:1px solid var(--line); border-radius:8px; padding:12px; }
+  .tabs button.on { border-color:var(--acc); color:var(--acc); }
+  .row { padding:8px; border:1px solid var(--line); border-radius:6px; margin-top:8px; cursor:pointer; }
+  .row:hover, .row.sel { border-color:var(--acc); }
+  .row small { color:var(--mute); }
+  .pill { font-size:11px; padding:1px 8px; border-radius:10px; float:right; }
+  .allow { background:#173b2a; color:var(--ok); } .flag { background:#40330f; color:var(--warn); } .quarantine { background:#431a21; color:var(--bad); }
+  .bar { height:8px; background:#1b2538; border-radius:4px; overflow:hidden; margin:3px 0 8px; }
+  .bar i { display:block; height:100%; background:var(--acc); }
+  label { display:block; color:var(--mute); margin-top:8px; font-size:12px; }
+  input, select, textarea { width:100%; background:#0e1522; color:var(--text); border:1px solid var(--line); border-radius:6px; padding:6px; font:inherit; }
+  ul { padding-left:18px; margin:6px 0; } pre { white-space:pre-wrap; margin:0; }
+  .note { color:var(--mute); font-size:12px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>SpectraGuard MVP</h1>
+  <button id="demo">Run demo scenario</button>
+  <button id="reset">Reset mailbox</button>
+  <span class="note">Mock mail system: quarantine is simulated, not a real mail-platform integration. Synthetic data only.</span>
+</header>
+<main>
+  <section class="panel">
+    <div class="tabs"><button data-f="inbox" class="on">Inbox</button> <button data-f="quarantine">Quarantine</button></div>
+    <div id="list"></div>
+    <h3>Send a test message</h3>
+    <form id="form">
+      <label>Channel</label><select name="channel"><option>email</option><option>chat</option></select>
+      <label>Sender name</label><input name="sender_name">
+      <label>Sender address / chat handle</label><input name="sender_addr" required>
+      <label>Subject</label><input name="subject">
+      <label>Body</label><textarea name="body" rows="4"></textarea>
+      <label>Authentication-Results header (email only, optional)</label>
+      <input name="auth" placeholder="spf=pass; dkim=pass; dmarc=pass">
+      <p><button>Send</button></p>
+    </form>
+  </section>
+  <section class="panel" id="detail"><p class="note">Select a message to see its score and reasons.</p></section>
+</main>
+<script>
+let folder = "inbox", selected = null;
+const $ = s => document.querySelector(s);
+const api = (p, o) => fetch("/api" + p, o).then(r => r.json());
+const post = (p, b) => api(p, { method:"POST", headers:{"Content-Type":"application/json"}, body: b ? JSON.stringify(b) : undefined });
+const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+
+async function refresh() {
+  const msgs = await api("/messages?folder=" + folder);
+  $("#list").innerHTML = msgs.map(m => `<div class="row ${m.id === selected ? "sel" : ""}" data-id="${m.id}">
+      <span class="pill ${m.decision}">${m.decision} ${m.score?.toFixed(2)}</span>
+      <b>${esc(m.sender_name || m.sender_addr)}</b> <small>${m.channel} #${m.id}</small><br>
+      <small>${esc(m.subject || m.body.slice(0, 60))}</small></div>`).join("") || '<p class="note">Empty.</p>';
+  document.querySelectorAll(".row").forEach(r => r.onclick = () => { selected = +r.dataset.id; show(); refresh(); });
+}
+async function show() {
+  if (!selected) return;
+  const m = await api("/messages/" + selected), d = m.detail || {};
+  const comps = d.components || {}, w = d.weights || {};
+  $("#detail").innerHTML = `<h3>#${m.id} ${esc(m.subject || "(chat message)")} <span class="pill ${m.decision}">${m.decision}</span></h3>
+    <p class="note">${esc(m.sender_name)} &lt;${esc(m.sender_addr)}&gt; via ${m.channel} · folder: ${m.folder}</p>
+    <p><b>Risk score ${m.score.toFixed(2)}</b> (initial heuristic weights, not validated)</p>
+    ${Object.keys(comps).map(k => `<div>${k} <span class="note">score ${comps[k].toFixed(2)} × weight ${w[k]}</span>
+      <div class="bar"><i style="width:${comps[k] * 100}%"></i></div></div>`).join("")}
+    <b>Reasons</b><ul>${(d.reasons || []).map(r => `<li><span class="note">${r.component}</span> ${esc(r.text)}</li>`).join("") || "<li>No risk signals found</li>"}</ul>
+    <pre>${esc(m.body)}</pre><p>
+    <button onclick="act('quarantine')">Quarantine</button> <button onclick="act('release')">Release</button>
+    <button onclick="lab('phishing')">Label: phishing</button> <button onclick="lab('benign')">Label: benign</button>
+    <span class="note">analyst label: ${m.label || "none"}</span></p>`;
+}
+window.act = async a => { await post(`/messages/${selected}/${a}`); await show(); refresh(); };
+window.lab = async l => { await post(`/messages/${selected}/label`, { label: l }); show(); };
+document.querySelectorAll(".tabs button").forEach(b => b.onclick = () => {
+  folder = b.dataset.f; document.querySelectorAll(".tabs button").forEach(x => x.classList.toggle("on", x === b)); refresh(); });
+$("#reset").onclick = async () => { await post("/reset"); selected = null; $("#detail").innerHTML = ""; refresh(); };
+$("#demo").onclick = async () => {
+  const steps = await post("/demo/run");
+  const s = steps.map(x => `${x.step}: score ${x.result.score.toFixed(2)} → ${x.result.decision}` +
+     (x.rescored?.length ? ` | rescored: ` + x.rescored.map(r => `#${r.id} ${r.score.toFixed(2)} → ${r.decision}`).join(", ") : "")).join("\n");
+  alert(s); refresh();
+};
+$("#form").onsubmit = async e => {
+  e.preventDefault();
+  const f = Object.fromEntries(new FormData(e.target));
+  const body = { channel: f.channel, sender_name: f.sender_name, sender_addr: f.sender_addr, subject: f.subject, body: f.body,
+                 headers: f.auth ? { "Authentication-Results": "mx; " + f.auth } : {} };
+  const r = await post("/messages", body);
+  selected = r.id; show(); refresh();
+};
+refresh();
+</script>
+</body>
+</html>

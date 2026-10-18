@@ -1,0 +1,8 @@
+From: Priya Nair <priya.nair@examplecorp.com>
+To: arjun.rao@examplecorp.com
+Subject: Urgent: approve vendor invoice today
+Date: Mon, 05 Jan 2026 09:00:00 +0000
+Authentication-Results: mx.examplecorp.com; spf=pass; dkim=pass; dmarc=pass
+Content-Type: text/plain; charset=utf-8
+
+Hi Arjun, please approve the VendorCo invoice before end of day: https://portal.examplecorp.com/invoices

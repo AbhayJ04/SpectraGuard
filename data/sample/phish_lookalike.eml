@@ -1,0 +1,9 @@
+From: IT Support <support@examp1ecorp.com>
+To: arjun.rao@examplecorp.com
+Subject: Verify your account now
+Date: Mon, 05 Jan 2026 09:05:00 +0000
+Authentication-Results: mx.examplecorp.com; spf=fail; dkim=fail; dmarc=fail
+Reply-To: helpdesk@mail-reply.top
+Content-Type: text/html; charset=utf-8
+
+<p>Your password expires today. <a href="http://examp1ecorp-login.top/verify">https://portal.examplecorp.com</a> to verify your account immediately.</p>
